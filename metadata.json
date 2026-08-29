@@ -1,0 +1,10 @@
+{
+  "name": "iOS Plant Identifier",
+  "description": "An iPhone-focused plant and flower identification and disease diagnosis application that recognizes species and pathogens from photos, providing cure guides.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
