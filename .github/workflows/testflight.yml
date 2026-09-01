@@ -1,0 +1,112 @@
+name: 🚀 Deploy FloraFinder AI to Apple TestFlight
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'App Marketing Version'
+        required: false
+        default: '1.0.0'
+
+concurrency:
+  group: 'testflight'
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    name: 🍏 Compile, Archive & Deliver to TestFlight
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🛠️ Select Xcode 26.x (iOS 26+ SDK)
+        run: |
+          echo "Available Xcode installations:"
+          ls -d /Applications/Xcode*.app
+          sudo xcode-select -s /Applications/Xcode_26.3.0.app || sudo xcode-select -s /Applications/Xcode_26.3.app || sudo xcode-select -s /Applications/Xcode_26.app || sudo xcode-select -s /Applications/Xcode.app
+          xcodebuild -version
+          swift --version
+
+      - name: ⚙️ Install XcodeGen
+        run: brew install xcodegen
+
+      - name: 🏗️ Generate Native Xcode Project
+        run: xcodegen generate
+
+      - name: 🔑 Configure App Store Connect API Credentials
+        env:
+          ASC_KEY_ID: "38F6WA87DU"
+          ASC_ISSUER_ID: "73c7355a-beef-4d79-919d-c3d7dec7747a"
+          ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          printf "%s\n" "$ASC_PRIVATE_KEY" > ~/.appstoreconnect/private_keys/AuthKey_38F6WA87DU.p8
+          chmod 600 ~/.appstoreconnect/private_keys/AuthKey_38F6WA87DU.p8
+          echo "✓ App Store Connect API Key installed safely."
+
+      - name: 🧪 Validate Apple API Key Connection
+        env:
+          ASC_KEY_ID: "38F6WA87DU"
+          ASC_ISSUER_ID: "73c7355a-beef-4d79-919d-c3d7dec7747a"
+        run: |
+          echo "Testing connection to Apple App Store Connect servers..."
+          xcrun altool --list-apps \
+            --apiKey "$ASC_KEY_ID" \
+            --apiIssuer "$ASC_ISSUER_ID"
+
+      - name: 🚀 Archive Release Candidate for TestFlight
+        env:
+          ASC_KEY_ID: "38F6WA87DU"
+          ASC_ISSUER_ID: "73c7355a-beef-4d79-919d-c3d7dec7747a"
+        run: |
+          mkdir -p build
+          echo "Archiving FloraFinderAI target for generic iOS device (Build #${{ github.run_number }})..."
+          xcodebuild archive \
+            -project FloraFinderAI.xcodeproj \
+            -scheme FloraFinderAI \
+            -configuration Release \
+            -archivePath build/FloraFinderAI.xcarchive \
+            -destination 'generic/platform=iOS' \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            MARKETING_VERSION="1.0.0" \
+            CODE_SIGN_STYLE=Automatic \
+            DEVELOPMENT_TEAM=523MJL63MC \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_38F6WA87DU.p8 \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+      - name: 📤 Export & Deliver to TestFlight via Apple Direct Upload
+        env:
+          ASC_KEY_ID: "38F6WA87DU"
+          ASC_ISSUER_ID: "73c7355a-beef-4d79-919d-c3d7dec7747a"
+        run: |
+          mkdir -p build/output
+          echo "Uploading archive directly to App Store Connect via native xcodebuild distribution..."
+          xcodebuild -exportArchive \
+            -archivePath build/FloraFinderAI.xcarchive \
+            -exportOptionsPlist ExportOptions.plist \
+            -exportPath build/output \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_38F6WA87DU.p8 \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+          
+          echo "=========================================================="
+          echo "🎉 FloraFinder AI Build #${{ github.run_number }} Successfully Delivered to Apple TestFlight!"
+          echo "Target Bundle: com.AlexMohit.FloraFinderAI"
+          echo "App Store Connect is processing the build for your iPhone."
+          echo "=========================================================="
