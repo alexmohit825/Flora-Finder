@@ -49,46 +49,27 @@ public final class GeminiBotanicalService {
         }
     }
     
+    public var hasConfiguredApiKey: Bool {
+        return !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    
     private init() {}
     
     /// High-Precision Primary Botanical Identification using Gemini 2.5 Flash
     public func identifyPlant(image: UIImage, organ: OrganType = .auto) async throws -> (matches: [PlantMatch], care: PlantCareProfile) {
+        guard hasConfiguredApiKey else {
+            throw NSError(
+                domain: "GeminiBotanicalService",
+                code: 401,
+                userInfo: [NSLocalizedDescriptionKey: "Gemini API Key Required. Please tap the Settings icon (⚙️) on the home screen to enter your Gemini API Key."]
+            )
+        }
+        
         guard let imageData = image.jpegData(compressionQuality: 0.85) else {
             throw NSError(domain: "GeminiBotanicalService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Image compression failed"])
         }
         
         let base64Image = imageData.base64EncodedString()
-        
-        guard !apiKey.isEmpty else {
-            // If no API key configured, return high-accuracy fallback profile
-            let match = PlantMatch(
-                plantId: "ficus_elastica_rubber_plant",
-                commonName: "Rubber Plant (Burgundy Rubber Fig)",
-                scientificName: "Ficus elastica",
-                family: "Moraceae",
-                genus: "Ficus",
-                confidence: 0.96,
-                rank: 1,
-                sourceEngine: "Gemini 2.5 Flash"
-            )
-            let care = PlantCareProfile(
-                plantId: match.plantId,
-                commonName: match.commonName,
-                scientificName: match.scientificName,
-                description: "Ficus elastica, commonly known as the rubber fig or rubber plant, is an ornamental broadleaf evergreen species in the fig genus, native to eastern and southeast Asia. Revered for its glossy, leathery dark-burgundy foliage and upright growth.",
-                category: "Broadleaf Evergreen / Houseplant",
-                care: CareDetails(
-                    sun: "Thrives in bright, indirect sunlight. Avoid direct intense scorching midday sun.",
-                    water: "Allow top 2-3 inches of soil to dry out between waterings. Reduce frequency during winter.",
-                    soil: "Well-aerated, well-draining peat-based potting soil mixed with perlite."
-                ),
-                toxicity: ToxicityDetails(
-                    human: "Mildly toxic if ingested; sap may cause contact dermatitis.",
-                    pets: "Toxic to dogs and cats due to proteolytic ficin enzymes and irritating latex sap."
-                )
-            )
-            return ([match], care)
-        }
         
         let urlString = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=\(apiKey)"
         guard let url = URL(string: urlString) else {
@@ -102,30 +83,30 @@ public final class GeminiBotanicalService {
         let promptText = """
         You are a master taxonomic botanist and horticultural scientist.
         Inspect the provided plant photo carefully and identify the EXACT botanical species.
-        Do NOT just classify as "Plant" or "Houseplant" — provide the specific common name, scientific binomial (e.g. Ficus elastica), botanical family (e.g. Moraceae), genus (e.g. Ficus), exact confidence score (0.0 to 1.0), and 2 alternative closest candidates.
-        Also provide a complete care profile and pet toxicity rating (dogs/cats).
+        Do NOT just classify as "Plant" or "Houseplant" or "Orchid" — identify the precise species binomial (e.g. Phalaenopsis aphrodite / Moth Orchid, Ficus elastica / Rubber Plant, Monstera deliciosa, etc.), botanical family (e.g. Orchidaceae, Moraceae), genus, confidence score, and 2 alternative closest species.
+        Also provide a complete horticultural care profile and pet toxicity rating (dogs/cats).
         
         Respond STRICTLY with a valid JSON object matching this schema:
         {
           "matches": [
             {
-              "plantId": "string (lowercase_slug e.g. ficus_elastica)",
-              "commonName": "string (capitalized English common name, e.g. Rubber Plant)",
-              "scientificName": "string (binomial, e.g. Ficus elastica)",
-              "family": "string (e.g. Moraceae)",
-              "genus": "string (e.g. Ficus)",
+              "plantId": "string (lowercase_slug e.g. phalaenopsis_aphrodite)",
+              "commonName": "string (e.g. Moth Orchid)",
+              "scientificName": "string (binomial, e.g. Phalaenopsis aphrodite)",
+              "family": "string (e.g. Orchidaceae)",
+              "genus": "string (e.g. Phalaenopsis)",
               "confidence": number (0.0 to 1.0),
               "rank": integer (1, 2, 3)
             }
           ],
           "care": {
-            "description": "string (historical and botanical overview)",
-            "category": "string (e.g. Broadleaf Evergreen, Succulent, Fern)",
-            "sun": "string (specific sunlight needs)",
-            "water": "string (specific hydration cycle)",
-            "soil": "string (soil mix composition)",
+            "description": "string (botanical and natural habitat overview)",
+            "category": "string (e.g. Epiphyte, Houseplant, Succulent)",
+            "sun": "string (specific sunlight requirements)",
+            "water": "string (specific hydration cycle and technique)",
+            "soil": "string (potting substrate/bark composition)",
             "humanToxicity": "string",
-            "petToxicity": "string"
+            "petToxicity": "string (explicit toxicity warnings for dogs and cats)"
           }
         }
         """
@@ -152,8 +133,17 @@ public final class GeminiBotanicalService {
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
         
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            throw NSError(domain: "GeminiBotanicalService", code: -3, userInfo: [NSLocalizedDescriptionKey: "Gemini API returned error status"])
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NSError(domain: "GeminiBotanicalService", code: -3, userInfo: [NSLocalizedDescriptionKey: "Invalid network response from server"])
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            let errorBody = String(data: data, encoding: .utf8) ?? "Unknown server error"
+            throw NSError(
+                domain: "GeminiBotanicalService",
+                code: httpResponse.statusCode,
+                userInfo: [NSLocalizedDescriptionKey: "Gemini API Error (HTTP \(httpResponse.statusCode)): \(errorBody)"]
+            )
         }
         
         if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -167,7 +157,7 @@ public final class GeminiBotanicalService {
             
             let parsed = try JSONDecoder().decode(GeminiIdentifyResponse.self, from: responseData)
             let topMatch = parsed.matches.first
-            let common = topMatch?.commonName ?? "Specimen"
+            let common = topMatch?.commonName ?? "Botanical Specimen"
             let scientific = topMatch?.scientificName ?? "Plantae"
             
             let careProfile = PlantCareProfile(
@@ -177,13 +167,13 @@ public final class GeminiBotanicalService {
                 description: parsed.care?.description ?? "A distinguished botanical specimen.",
                 category: parsed.care?.category ?? "Ornamental Plant",
                 care: CareDetails(
-                    sun: parsed.care?.sun ?? "Bright indirect light.",
-                    water: parsed.care?.water ?? "Water when topsoil is dry.",
-                    soil: parsed.care?.soil ?? "Well-draining potting soil."
+                    sun: parsed.care?.sun ?? "Bright indirect sunlight.",
+                    water: parsed.care?.water ?? "Water thoroughly when top substrate is dry.",
+                    soil: parsed.care?.soil ?? "Well-draining potting substrate."
                 ),
                 toxicity: ToxicityDetails(
-                    human: parsed.care?.humanToxicity ?? "Non-toxic.",
-                    pets: parsed.care?.petToxicity ?? "Keep away from pets."
+                    human: parsed.care?.humanToxicity ?? "Non-toxic under standard handling.",
+                    pets: parsed.care?.petToxicity ?? "Check pet toxicity specifics."
                 )
             )
             
@@ -195,30 +185,19 @@ public final class GeminiBotanicalService {
     
     /// Diagnoses plant health, pathogens, pests, and recovery regimens
     public func diagnosePlant(image: UIImage) async throws -> PlantDiseaseDiagnosis {
+        guard hasConfiguredApiKey else {
+            throw NSError(
+                domain: "GeminiBotanicalService",
+                code: 401,
+                userInfo: [NSLocalizedDescriptionKey: "Gemini API Key Required. Please tap the Settings icon (⚙️) to configure your key."]
+            )
+        }
+        
         guard let imageData = image.jpegData(compressionQuality: 0.85) else {
             throw NSError(domain: "GeminiBotanicalService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Image compression failed"])
         }
         
         let base64Image = imageData.base64EncodedString()
-        
-        guard !apiKey.isEmpty else {
-            return PlantDiseaseDiagnosis(
-                isDiseased: false,
-                healthScore: 94,
-                diseaseName: "Healthy Foliage",
-                scientificName: "N/A",
-                confidence: 0.95,
-                severity: "Healthy",
-                symptoms: ["Vibrant leaf pigmentation", "Turgid vascular structure", "Zero fungal spot lesions detected"],
-                causes: ["Balanced photoperiod and optimal hydration schedule"],
-                treatment: DiseaseTreatment(
-                    immediate: "Maintain current hydration and bright, indirect ambient light.",
-                    organic: "Apply diluted seaweed extract or organic kelp meal during active growing months.",
-                    chemical: "No chemical intervention required."
-                ),
-                prevention: ["Ensure adequate pot drainage", "Avoid overhead watering to discourage fungal spore proliferation"]
-            )
-        }
         
         let urlString = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=\(apiKey)"
         guard let url = URL(string: urlString) else {
@@ -230,7 +209,7 @@ public final class GeminiBotanicalService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
         let promptText = """
-        You are a master plant pathologist and plant doctor. Analyze this plant specimen and diagnose any diseases, leaf spots, nutrient deficiencies, or pests.
+        You are a master plant pathologist and botanical doctor. Analyze this plant specimen and diagnose any diseases, leaf spots, pest infestations, fungal issues, or nutrient deficiencies.
         Respond strictly with a JSON object matching this schema:
         {
           "isDiseased": boolean,
@@ -272,8 +251,17 @@ public final class GeminiBotanicalService {
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
         
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            throw NSError(domain: "GeminiBotanicalService", code: -3, userInfo: [NSLocalizedDescriptionKey: "Gemini API returned error status"])
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NSError(domain: "GeminiBotanicalService", code: -3, userInfo: [NSLocalizedDescriptionKey: "Invalid network response"])
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            let errorBody = String(data: data, encoding: .utf8) ?? "Unknown server error"
+            throw NSError(
+                domain: "GeminiBotanicalService",
+                code: httpResponse.statusCode,
+                userInfo: [NSLocalizedDescriptionKey: "Gemini Diagnosis API Error (HTTP \(httpResponse.statusCode)): \(errorBody)"]
+            )
         }
         
         if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -290,24 +278,5 @@ public final class GeminiBotanicalService {
         }
         
         throw NSError(domain: "GeminiBotanicalService", code: -4, userInfo: [NSLocalizedDescriptionKey: "Failed to parse Gemini JSON payload"])
-    }
-    
-    public func fetchCareProfile(plantName: String) async -> PlantCareProfile {
-        return PlantCareProfile(
-            plantId: plantName.lowercased().replacingOccurrences(of: " ", with: "_"),
-            commonName: plantName,
-            scientificName: "Taxonomic Binomial: \(plantName)",
-            description: "A distinguished botanical specimen characterized by hardy vascular structure, responsive photosynthetic foliage, and distinct floral or leaf architectures.",
-            category: "Ornamental Flora",
-            care: CareDetails(
-                sun: "Bright, filtered morning sunlight. Protect from scorching mid-afternoon ultraviolet exposure.",
-                water: "Water thoroughly when the top 1-2 inches of soil feel dry to the touch. Avoid standing water in saucers.",
-                soil: "Well-draining, rich loamy potting mix with perlite and organic peat compost."
-            ),
-            toxicity: ToxicityDetails(
-                human: "Non-toxic under normal household handling. Do not ingest.",
-                pets: "Generally pet-safe. Keep out of reach of inquisitive cats and dogs."
-            )
-        )
     }
 }

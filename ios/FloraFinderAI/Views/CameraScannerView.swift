@@ -23,6 +23,9 @@ public struct CameraScannerView: View {
     @State private var processingStatus = "Analyzing botanical morphology with Gemini 2.5 Flash..."
     @State private var completedObservation: PlantObservation?
     @State private var showingDetail = false
+    @State private var showingSettings = false
+    @State private var errorMessage: String?
+    @State private var showingErrorAlert = false
     @State private var scanLineOffset: CGFloat = -140
     
     public init(initialMode: String = "identify") {
@@ -253,6 +256,17 @@ public struct CameraScannerView: View {
                     ObservationDetailView(observation: obs)
                 }
             }
+            .sheet(isPresented: $showingSettings) {
+                SettingsView()
+            }
+            .alert("Gemini API Key Required", isPresented: $showingErrorAlert) {
+                Button("Open Settings") {
+                    showingSettings = true
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text(errorMessage ?? "Please enter your Gemini API Key in Settings to enable real-time AI species identification.")
+            }
             .onChange(of: selectedPhotoItem) { _, newItem in
                 guard let newItem = newItem else { return }
                 Task {
@@ -277,6 +291,15 @@ public struct CameraScannerView: View {
     
     private func processCapturedImage(_ image: UIImage) async {
         guard let jpegData = image.jpegData(compressionQuality: 0.85) else { return }
+        
+        guard GeminiBotanicalService.shared.hasConfiguredApiKey else {
+            await MainActor.run {
+                self.errorMessage = "To identify exact plant species (e.g. Moth Orchid, Ficus elastica), please enter your Gemini API Key in Settings."
+                self.showingErrorAlert = true
+            }
+            return
+        }
+        
         isProcessing = true
         
         do {
@@ -287,18 +310,10 @@ public struct CameraScannerView: View {
             
             if scanMode == "identify" {
                 processingStatus = "Analyzing species taxonomy with Gemini 2.5 Flash..."
-                do {
-                    let result = try await GeminiBotanicalService.shared.identifyPlant(image: image, organ: selectedOrgan)
-                    matches = result.matches
-                    careProfile = result.care
-                    aiProvider = "Google Gemini 2.5 Flash"
-                } catch {
-                    print("Gemini call failed, falling back to Apple Vision: \(error)")
-                    matches = try await AppleVisionClassifier.shared.classifyPlant(image: image)
-                    let primary = matches.first?.commonName ?? "Specimen"
-                    careProfile = await GeminiBotanicalService.shared.fetchCareProfile(plantName: primary)
-                    aiProvider = "Apple Vision (On-Device Fallback)"
-                }
+                let result = try await GeminiBotanicalService.shared.identifyPlant(image: image, organ: selectedOrgan)
+                matches = result.matches
+                careProfile = result.care
+                aiProvider = "Google Gemini 2.5 Flash"
             } else {
                 processingStatus = "Analyzing plant health with Gemini Pathologist Engine..."
                 diagnosis = try await GeminiBotanicalService.shared.diagnosePlant(image: image)
@@ -323,9 +338,11 @@ public struct CameraScannerView: View {
             }
             
         } catch {
-            print("Processing error: \(error)")
+            print("Gemini processing error: \(error)")
             await MainActor.run {
                 self.isProcessing = false
+                self.errorMessage = error.localizedDescription
+                self.showingErrorAlert = true
             }
         }
     }
