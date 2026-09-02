@@ -55,7 +55,7 @@ public final class GeminiBotanicalService {
     
     private init() {}
     
-    /// High-Precision Primary Botanical Identification using Gemini 2.5 Flash
+    /// High-Precision Primary Botanical Identification using Gemini 3.6 Flash
     public func identifyPlant(image: UIImage, organ: OrganType = .auto) async throws -> (matches: [PlantMatch], care: PlantCareProfile) {
         guard hasConfiguredApiKey else {
             throw NSError(
@@ -71,7 +71,7 @@ public final class GeminiBotanicalService {
         
         let base64Image = imageData.base64EncodedString()
         
-        let urlString = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=\(apiKey)"
+        let urlString = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=\(apiKey)"
         guard let url = URL(string: urlString) else {
             throw NSError(domain: "GeminiBotanicalService", code: -2, userInfo: [NSLocalizedDescriptionKey: "Invalid Gemini Endpoint URL"])
         }
@@ -199,7 +199,7 @@ public final class GeminiBotanicalService {
         
         let base64Image = imageData.base64EncodedString()
         
-        let urlString = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=\(apiKey)"
+        let urlString = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=\(apiKey)"
         guard let url = URL(string: urlString) else {
             throw NSError(domain: "GeminiBotanicalService", code: -2, userInfo: [NSLocalizedDescriptionKey: "Invalid Gemini Endpoint"])
         }
