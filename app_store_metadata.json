@@ -1,0 +1,30 @@
+{
+  "app_identity": {
+    "bundle_id": "com.AlexMohit.FloraFinderAI",
+    "app_name": "FloraFinder AI",
+    "primary_locale": "en-US"
+  },
+  "general_information": {
+    "subtitle": "AI Plant & Disease Identifier",
+    "primary_category": "EDUCATION",
+    "secondary_category": "UTILITIES",
+    "privacy_policy_url": "https://github.com/alexmohit825/Flora-Finder/blob/main/PRIVACY_POLICY.md"
+  },
+  "version_metadata": {
+    "version_string": "1.0",
+    "copyright": "2026 A. Alex Mohit",
+    "description": "FloraFinder AI is your intelligent botanical companion, powered by on-device Apple Intelligence and deep plant pathology AI.\n\nKey Features:\n\u2022 Instant On-Device Identification: Point your camera at any plant, flower, tree, or leaf to identify taxonomy, genus, and binomial nomenclature with zero cloud latency and complete offline privacy.\n\u2022 Plant Doctor & Pathology Rx: Diagnose plant diseases, leaf spots, nutrient deficiencies, and pest infestations. Get actionable immediate, organic, and chemical recovery regimens.\n\u2022 Complete Horticultural Care Guides: Master sunlight requirements, watering cycles, soil composition, and pet toxicity alerts for dogs and cats.\n\u2022 Private & Secure: On-device neural vision processing keeps your photos private on your device.",
+    "keywords": "plant identifier,flora,leaf identifier,plant disease,botany,houseplants,gardening,flower id",
+    "support_url": "https://github.com/alexmohit825/Flora-Finder",
+    "marketing_url": "https://github.com/alexmohit825/Flora-Finder",
+    "promotional_text": "Instant on-device plant identification, pet toxicity safety alerts, and deep AI disease diagnostics."
+  },
+  "app_review_information": {
+    "contact_first_name": "Alex",
+    "contact_last_name": "Mohit",
+    "contact_email": "mohalex@gmail.com",
+    "contact_phone": "12066795710",
+    "sign_in_required": false,
+    "review_notes": "FloraFinder AI uses on-device Apple Vision for real-time plant and flower identification, with cloud AI for disease pathology diagnosis. No login or demo account is required to access full functionality."
+  }
+}

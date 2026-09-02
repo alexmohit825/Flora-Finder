@@ -12,6 +12,7 @@ public struct HomeView: View {
     @EnvironmentObject private var store: ObservationStore
     @State private var activeScanMode: String?
     @State private var showingScanner = false
+    @State private var showingSettings = false
     @State private var selectedObservation: PlantObservation?
     
     public var body: some View {
@@ -34,7 +35,7 @@ public struct HomeView: View {
                                     .font(.title3)
                                     .fontWeight(.bold)
                                     .foregroundColor(.white)
-                                Text("Apple Intelligence Botanical Engine")
+                                Text("Botanical Taxonomy & Pathology")
                                     .font(.caption2)
                                     .foregroundColor(.purple.opacity(0.8))
                             }
@@ -42,16 +43,29 @@ public struct HomeView: View {
                         
                         Spacer()
                         
-                        HStack(spacing: 4) {
-                            Image(systemName: "leaf.fill")
-                            Text("\(store.observations.count)")
+                        HStack(spacing: 10) {
+                            Button {
+                                showingSettings = true
+                            } label: {
+                                Image(systemName: "gearshape.fill")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(.purple)
+                                    .padding(8)
+                                    .background(Color.purple.opacity(0.15))
+                                    .clipShape(Circle())
+                            }
+                            
+                            HStack(spacing: 4) {
+                                Image(systemName: "leaf.fill")
+                                Text("\(store.observations.count)")
+                            }
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            .foregroundColor(.purple)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color.purple.opacity(0.15))
+                            .clipShape(Capsule())
                         }
-                        .font(.system(size: 12, weight: .bold, design: .monospaced))
-                        .foregroundColor(.purple)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Color.purple.opacity(0.15))
-                        .clipShape(Capsule())
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 12)
@@ -76,7 +90,7 @@ public struct HomeView: View {
                                         .font(.subheadline)
                                         .fontWeight(.bold)
                                         .foregroundColor(.white)
-                                    Text("Apple On-Device Vision")
+                                    Text("Gemini 2.5 Flash Precision")
                                         .font(.caption2)
                                         .foregroundColor(.gray)
                                 }
@@ -154,7 +168,7 @@ public struct HomeView: View {
                                     .font(.subheadline)
                                     .fontWeight(.bold)
                                     .foregroundColor(.white)
-                                Text("Point your camera at any live plant or flower to identify taxonomy, diagnose health, and receive care instructions.")
+                                Text("Point your camera at any live plant or flower to identify exact species, diagnose health, and receive care instructions.")
                                     .font(.caption)
                                     .foregroundColor(.gray)
                                     .multilineTextAlignment(.center)
@@ -218,6 +232,9 @@ public struct HomeView: View {
             .background(Color(white: 0.04).ignoresSafeArea())
             .fullScreenCover(isPresented: $showingScanner) {
                 CameraScannerView(initialMode: activeScanMode ?? "identify")
+            }
+            .sheet(isPresented: $showingSettings) {
+                SettingsView()
             }
         }
     }

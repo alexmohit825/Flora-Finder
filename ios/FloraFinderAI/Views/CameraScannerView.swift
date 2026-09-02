@@ -20,7 +20,7 @@ public struct CameraScannerView: View {
     @State private var selectedPhotoItem: PhotosPickerItem?
     
     @State private var isProcessing = false
-    @State private var processingStatus = "Initializing Apple Vision Neural Engine..."
+    @State private var processingStatus = "Analyzing botanical morphology with Gemini 2.5 Flash..."
     @State private var completedObservation: PlantObservation?
     @State private var showingDetail = false
     @State private var scanLineOffset: CGFloat = -140
@@ -46,7 +46,7 @@ public struct CameraScannerView: View {
                         Text("Camera Permission Needed")
                             .font(.headline)
                             .foregroundColor(.white)
-                        Text("FloraFinder uses the camera and Apple Intelligence to recognize botanical specimens in real-time.")
+                        Text("FloraFinder uses the camera to recognize botanical specimens and diagnose plant health in real-time.")
                             .font(.caption)
                             .foregroundColor(.gray)
                             .multilineTextAlignment(.center)
@@ -282,20 +282,28 @@ public struct CameraScannerView: View {
         do {
             var matches: [PlantMatch] = []
             var diagnosis: PlantDiseaseDiagnosis? = nil
-            var aiProvider = "Apple Intelligence"
+            var careProfile: PlantCareProfile? = nil
+            var aiProvider = "Google Gemini 2.5 Flash"
             
             if scanMode == "identify" {
-                processingStatus = "Running Apple Vision Neural Engine on-device..."
-                matches = try await AppleVisionClassifier.shared.classifyPlant(image: image)
-                aiProvider = "Apple Intelligence (On-Device Vision)"
+                processingStatus = "Analyzing species taxonomy with Gemini 2.5 Flash..."
+                do {
+                    let result = try await GeminiBotanicalService.shared.identifyPlant(image: image, organ: selectedOrgan)
+                    matches = result.matches
+                    careProfile = result.care
+                    aiProvider = "Google Gemini 2.5 Flash"
+                } catch {
+                    print("Gemini call failed, falling back to Apple Vision: \(error)")
+                    matches = try await AppleVisionClassifier.shared.classifyPlant(image: image)
+                    let primary = matches.first?.commonName ?? "Specimen"
+                    careProfile = await GeminiBotanicalService.shared.fetchCareProfile(plantName: primary)
+                    aiProvider = "Apple Vision (On-Device Fallback)"
+                }
             } else {
-                processingStatus = "Running Gemini Plant Pathologist Engine..."
+                processingStatus = "Analyzing plant health with Gemini Pathologist Engine..."
                 diagnosis = try await GeminiBotanicalService.shared.diagnosePlant(image: image)
-                aiProvider = "Gemini 2.5 Flash Cloud"
+                aiProvider = "Google Gemini 2.5 Flash"
             }
-            
-            let primaryName = matches.first?.commonName ?? "Specimen"
-            let careProfile = await GeminiBotanicalService.shared.fetchCareProfile(plantName: primaryName)
             
             let observation = PlantObservation(
                 imageData: jpegData,
@@ -321,37 +329,4 @@ public struct CameraScannerView: View {
             }
         }
     }
-}
-
-struct CornerBrackets: View {
-    var body: some View {
-        GeometryReader { geo in
-            let w = geo.size.width
-            let h = geo.size.height
-            let len: CGFloat = 24
-            
-            Path { path in
-                path.move(to: CGPoint(x: 0, y: len))
-                path.addLine(to: CGPoint(x: 0, y: 0))
-                path.addLine(to: CGPoint(x: len, y: 0))
-                
-                path.move(to: CGPoint(x: w - len, y: 0))
-                path.addLine(to: CGPoint(x: w, y: 0))
-                path.addLine(to: CGPoint(x: w, y: len))
-                
-                path.move(to: CGPoint(x: 0, y: h - len))
-                path.addLine(to: CGPoint(x: 0, y: h))
-                path.addLine(to: CGPoint(x: len, y: h))
-                
-                path.move(to: CGPoint(x: w - len, y: h))
-                path.addLine(to: CGPoint(x: w, y: h))
-                path.addLine(to: CGPoint(x: w, y: h - len))
-            }
-            .stroke(style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
-        }
-    }
-}
-
-extension Color {
-    static let emerald = Color(red: 16/255, green: 185/255, blue: 129/255)
 }
