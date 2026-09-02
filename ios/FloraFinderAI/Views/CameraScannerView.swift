@@ -13,6 +13,7 @@ public struct CameraScannerView: View {
     public let initialMode: String
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var store: ObservationStore
+    @ObservedObject private var subscriptionManager = SubscriptionManager.shared
     
     @StateObject private var camera = CameraService()
     @State private var scanMode: String
@@ -20,10 +21,11 @@ public struct CameraScannerView: View {
     @State private var selectedPhotoItem: PhotosPickerItem?
     
     @State private var isProcessing = false
-    @State private var processingStatus = "Analyzing botanical morphology with Gemini 2.5 Flash..."
+    @State private var processingStatus = "Analyzing botanical morphology with Gemini 3.6 Flash..."
     @State private var completedObservation: PlantObservation?
     @State private var showingDetail = false
     @State private var showingSettings = false
+    @State private var showingPaywall = false
     @State private var errorMessage: String?
     @State private var showingErrorAlert = false
     @State private var scanLineOffset: CGFloat = -140
@@ -259,16 +261,20 @@ public struct CameraScannerView: View {
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
             }
-            .alert("Gemini API Key Required", isPresented: $showingErrorAlert) {
-                Button("Open Settings") {
-                    showingSettings = true
-                }
-                Button("Cancel", role: .cancel) {}
+            .sheet(isPresented: $showingPaywall) {
+                PaywallView()
+            }
+            .alert("Notice", isPresented: $showingErrorAlert) {
+                Button("OK", role: .cancel) {}
             } message: {
-                Text(errorMessage ?? "Please enter your Gemini API Key in Settings to enable real-time AI species identification.")
+                Text(errorMessage ?? "An error occurred during plant identification.")
             }
             .onChange(of: selectedPhotoItem) { _, newItem in
                 guard let newItem = newItem else { return }
+                if !subscriptionManager.isProUser && store.remainingFreeScans <= 0 {
+                    showingPaywall = true
+                    return
+                }
                 Task {
                     if let data = try? await newItem.loadTransferable(type: Data.self),
                        let image = UIImage(data: data) {
@@ -280,6 +286,11 @@ public struct CameraScannerView: View {
     }
     
     private func triggerCapture() async {
+        if !subscriptionManager.isProUser && store.remainingFreeScans <= 0 {
+            showingPaywall = true
+            return
+        }
+        
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         do {
             let photo = try await camera.capturePhoto()
@@ -292,32 +303,24 @@ public struct CameraScannerView: View {
     private func processCapturedImage(_ image: UIImage) async {
         guard let jpegData = image.jpegData(compressionQuality: 0.85) else { return }
         
-        guard GeminiBotanicalService.shared.hasConfiguredApiKey else {
-            await MainActor.run {
-                self.errorMessage = "To identify exact plant species (e.g. Moth Orchid, Ficus elastica), please enter your Gemini API Key in Settings."
-                self.showingErrorAlert = true
-            }
-            return
-        }
-        
         isProcessing = true
         
         do {
             var matches: [PlantMatch] = []
             var diagnosis: PlantDiseaseDiagnosis? = nil
             var careProfile: PlantCareProfile? = nil
-            var aiProvider = "Google Gemini 2.5 Flash"
+            var aiProvider = "Google Gemini 3.6 Flash"
             
             if scanMode == "identify" {
-                processingStatus = "Analyzing species taxonomy with Gemini 2.5 Flash..."
+                processingStatus = "Analyzing species taxonomy with Gemini 3.6 Flash..."
                 let result = try await GeminiBotanicalService.shared.identifyPlant(image: image, organ: selectedOrgan)
                 matches = result.matches
                 careProfile = result.care
-                aiProvider = "Google Gemini 2.5 Flash"
+                aiProvider = "Google Gemini 3.6 Flash"
             } else {
                 processingStatus = "Analyzing plant health with Gemini Pathologist Engine..."
                 diagnosis = try await GeminiBotanicalService.shared.diagnosePlant(image: image)
-                aiProvider = "Google Gemini 2.5 Flash"
+                aiProvider = "Google Gemini 3.6 Flash"
             }
             
             let observation = PlantObservation(

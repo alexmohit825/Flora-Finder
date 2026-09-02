@@ -13,11 +13,20 @@ import Combine
 @MainActor
 public class ObservationStore: ObservableObject {
     @Published public var observations: [PlantObservation] = []
+    @Published public var freeScansUsed: Int = 0
+    
+    public let maxFreeScans: Int = 3
+    
+    public var remainingFreeScans: Int {
+        return max(0, maxFreeScans - freeScansUsed)
+    }
     
     private let storageKey = "florafinder_native_observations_v1"
+    private let scanCountKey = "florafinder_free_scans_count_v1"
     
     public init() {
         loadObservations()
+        self.freeScansUsed = UserDefaults.standard.integer(forKey: scanCountKey)
     }
     
     public func loadObservations() {
@@ -46,6 +55,11 @@ public class ObservationStore: ObservableObject {
     public func addObservation(_ observation: PlantObservation) {
         observations.insert(observation, at: 0)
         saveObservations()
+        
+        if !SubscriptionManager.shared.isProUser {
+            freeScansUsed += 1
+            UserDefaults.standard.set(freeScansUsed, forKey: scanCountKey)
+        }
     }
     
     public func deleteObservation(id: String) {
@@ -57,4 +71,4 @@ public class ObservationStore: ObservableObject {
         observations.removeAll()
         saveObservations()
     }
-}
+}\n
