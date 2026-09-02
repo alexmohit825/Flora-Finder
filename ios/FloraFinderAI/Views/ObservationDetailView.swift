@@ -37,7 +37,7 @@ public struct ObservationDetailView: View {
                     
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 6) {
-                            Image(systemName: "apple.logo")
+                            Image(systemName: "sparkles")
                             Text(observation.aiProvider)
                         }
                         .font(.system(size: 10, weight: .bold))
@@ -65,13 +65,13 @@ public struct ObservationDetailView: View {
                 VStack(spacing: 20) {
                     if !observation.matches.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Apple Intelligence Matches")
+                            Text("Taxonomic Matches")
                                 .font(.footnote)
                                 .fontWeight(.bold)
                                 .foregroundColor(.gray)
                                 .textCase(.uppercase)
                             
-                            ForEach(observation.matches) { match in
+                            ForEach(observation.matches, id: \.id) { match in
                                 HStack {
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(match.commonName)
