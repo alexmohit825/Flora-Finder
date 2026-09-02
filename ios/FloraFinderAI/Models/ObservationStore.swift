@@ -71,4 +71,4 @@ public class ObservationStore: ObservableObject {
         observations.removeAll()
         saveObservations()
     }
-}\n
+}

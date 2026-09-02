@@ -316,4 +316,4 @@ public struct HomeView: View {
             showingScanner = true
         }
     }
-}\n
+}

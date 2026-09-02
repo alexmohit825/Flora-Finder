@@ -328,4 +328,4 @@ struct ProductCardView: View {
             )
         }
     }
-}\n
+}

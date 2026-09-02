@@ -124,4 +124,4 @@ public class SubscriptionManager: ObservableObject {
             return safe
         }
     }
-}\n
+}

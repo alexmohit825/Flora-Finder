@@ -120,4 +120,4 @@ public struct SettingsView: View {
             }
         }
     }
-}\n
+}
