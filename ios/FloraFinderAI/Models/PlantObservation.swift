@@ -72,6 +72,22 @@ public struct PlantMatch: Identifiable, Codable, Equatable {
         self.rank = rank
         self.sourceEngine = sourceEngine
     }
+    
+    private enum CodingKeys: String, CodingKey {
+        case plantId, commonName, scientificName, family, genus, confidence, rank, sourceEngine
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.plantId = try container.decodeIfPresent(String.self, forKey: .plantId) ?? UUID().uuidString
+        self.commonName = try container.decodeIfPresent(String.self, forKey: .commonName) ?? "Identified Plant"
+        self.scientificName = try container.decodeIfPresent(String.self, forKey: .scientificName) ?? "Plantae"
+        self.family = try container.decodeIfPresent(String.self, forKey: .family) ?? ""
+        self.genus = try container.decodeIfPresent(String.self, forKey: .genus) ?? ""
+        self.confidence = try container.decodeIfPresent(Double.self, forKey: .confidence) ?? 0.90
+        self.rank = try container.decodeIfPresent(Int.self, forKey: .rank) ?? 1
+        self.sourceEngine = try container.decodeIfPresent(String.self, forKey: .sourceEngine) ?? "Google Gemini 3.6 Flash"
+    }
 }
 
 public struct PlantDiseaseDiagnosis: Codable, Equatable {
@@ -109,6 +125,24 @@ public struct PlantDiseaseDiagnosis: Codable, Equatable {
         self.treatment = treatment
         self.prevention = prevention
     }
+    
+    private enum CodingKeys: String, CodingKey {
+        case isDiseased, healthScore, diseaseName, scientificName, confidence, severity, symptoms, causes, treatment, prevention
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.isDiseased = try container.decodeIfPresent(Bool.self, forKey: .isDiseased) ?? false
+        self.healthScore = try container.decodeIfPresent(Int.self, forKey: .healthScore) ?? 95
+        self.diseaseName = try container.decodeIfPresent(String.self, forKey: .diseaseName) ?? "Healthy Specimen"
+        self.scientificName = try container.decodeIfPresent(String.self, forKey: .scientificName) ?? "Plantae"
+        self.confidence = try container.decodeIfPresent(Double.self, forKey: .confidence) ?? 0.95
+        self.severity = try container.decodeIfPresent(String.self, forKey: .severity) ?? "Healthy"
+        self.symptoms = try container.decodeIfPresent([String].self, forKey: .symptoms) ?? []
+        self.causes = try container.decodeIfPresent([String].self, forKey: .causes) ?? []
+        self.treatment = try container.decodeIfPresent(DiseaseTreatment.self, forKey: .treatment) ?? DiseaseTreatment(immediate: "Maintain proper lighting and hydration.", organic: "Ensure adequate airflow.", chemical: "None required.")
+        self.prevention = try container.decodeIfPresent([String].self, forKey: .prevention) ?? ["Avoid overwatering", "Ensure proper drainage"]
+    }
 }
 
 public struct DiseaseTreatment: Codable, Equatable {
@@ -120,6 +154,17 @@ public struct DiseaseTreatment: Codable, Equatable {
         self.immediate = immediate
         self.organic = organic
         self.chemical = chemical
+    }
+    
+    private enum CodingKeys: String, CodingKey {
+        case immediate, organic, chemical
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.immediate = try container.decodeIfPresent(String.self, forKey: .immediate) ?? "Monitor plant carefully."
+        self.organic = try container.decodeIfPresent(String.self, forKey: .organic) ?? "Ensure adequate sunlight and clean water."
+        self.chemical = try container.decodeIfPresent(String.self, forKey: .chemical) ?? "None required."
     }
 }
 

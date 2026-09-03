@@ -61,7 +61,10 @@ jobs:
           echo "✓ Secrets.plist generated for build."
 
       - name: 🏗️ Generate Native Xcode Project
-        run: xcodegen generate
+        run: |
+          BUILD_NUM=$(( ${{ github.run_number }} + 100 ))
+          echo "Generating project with build number: $BUILD_NUM"
+          BUILD_NUMBER="$BUILD_NUM" xcodegen generate
 
       - name: 🔑 Configure App Store Connect API Credentials
         env:
@@ -90,14 +93,15 @@ jobs:
           ASC_ISSUER_ID: "73c7355a-beef-4d79-919d-c3d7dec7747a"
         run: |
           mkdir -p build
-          echo "Archiving FloraFinderAI target for generic iOS device (Build #${{ github.run_number }})..."
+          BUILD_NUM=$(( ${{ github.run_number }} + 100 ))
+          echo "Archiving FloraFinderAI target for generic iOS device (Build #$BUILD_NUM)..."
           xcodebuild archive \
             -project FloraFinderAI.xcodeproj \
             -scheme FloraFinderAI \
             -configuration Release \
             -archivePath build/FloraFinderAI.xcarchive \
             -destination 'generic/platform=iOS' \
-            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUM" \
             MARKETING_VERSION="1.0.0" \
             CODE_SIGN_STYLE=Automatic \
             DEVELOPMENT_TEAM=523MJL63MC \

@@ -9,19 +9,29 @@
 import Foundation
 import UIKit
 
-public struct GeminiIdentifyResponse: Codable {
-    public let matches: [PlantMatch]
-    public let care: GeminiCareResponse?
+public struct GeminiMatchDTO: Codable {
+    public let plantId: String?
+    public let commonName: String?
+    public let scientificName: String?
+    public let family: String?
+    public let genus: String?
+    public let confidence: Double?
+    public let rank: Int?
 }
 
 public struct GeminiCareResponse: Codable {
-    public let description: String
-    public let category: String
-    public let sun: String
-    public let water: String
-    public let soil: String
-    public let humanToxicity: String
-    public let petToxicity: String
+    public let description: String?
+    public let category: String?
+    public let sun: String?
+    public let water: String?
+    public let soil: String?
+    public let humanToxicity: String?
+    public let petToxicity: String?
+}
+
+public struct GeminiIdentifyResponse: Codable {
+    public let matches: [GeminiMatchDTO]?
+    public let care: GeminiCareResponse?
 }
 
 public final class GeminiBotanicalService {
@@ -54,6 +64,19 @@ public final class GeminiBotanicalService {
     }
     
     private init() {}
+    
+    private func cleanJsonString(_ rawText: String) -> String {
+        var text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.hasPrefix("```json") {
+            text = String(text.dropFirst(7))
+        } else if text.hasPrefix("```") {
+            text = String(text.dropFirst(3))
+        }
+        if text.hasSuffix("```") {
+            text = String(text.dropLast(3))
+        }
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
     
     /// High-Precision Primary Botanical Identification using Gemini 3.6 Flash
     public func identifyPlant(image: UIImage, organ: OrganType = .auto) async throws -> (matches: [PlantMatch], care: PlantCareProfile) {
@@ -152,11 +175,36 @@ public final class GeminiBotanicalService {
            let content = firstCandidate["content"] as? [String: Any],
            let parts = content["parts"] as? [[String: Any]],
            let firstPart = parts.first,
-           let text = firstPart["text"] as? String,
-           let responseData = text.data(using: .utf8) {
+           let text = firstPart["text"] as? String {
             
-            let parsed = try JSONDecoder().decode(GeminiIdentifyResponse.self, from: responseData)
-            let topMatch = parsed.matches.first
+            let cleanedText = cleanJsonString(text)
+            guard let responseData = cleanedText.data(using: .utf8) else {
+                throw NSError(domain: "GeminiBotanicalService", code: -4, userInfo: [NSLocalizedDescriptionKey: "Invalid text encoding in Gemini response"])
+            }
+            
+            let parsed: GeminiIdentifyResponse
+            do {
+                parsed = try JSONDecoder().decode(GeminiIdentifyResponse.self, from: responseData)
+            } catch {
+                print("Gemini decoding error: \(error), raw text: \(cleanedText)")
+                throw NSError(domain: "GeminiBotanicalService", code: -4, userInfo: [NSLocalizedDescriptionKey: "Could not parse plant taxonomy: \(error.localizedDescription)"])
+            }
+            
+            let rawMatches = parsed.matches ?? []
+            let domainMatches: [PlantMatch] = rawMatches.enumerated().map { index, dto in
+                PlantMatch(
+                    plantId: dto.plantId ?? "specimen_\(index + 1)",
+                    commonName: dto.commonName ?? "Identified Specimen",
+                    scientificName: dto.scientificName ?? "Plantae",
+                    family: dto.family ?? "Botanical",
+                    genus: dto.genus ?? "Flora",
+                    confidence: dto.confidence ?? (0.95 - Double(index) * 0.05),
+                    rank: dto.rank ?? (index + 1),
+                    sourceEngine: "Google Gemini 3.6 Flash"
+                )
+            }
+            
+            let topMatch = domainMatches.first
             let common = topMatch?.commonName ?? "Botanical Specimen"
             let scientific = topMatch?.scientificName ?? "Plantae"
             
@@ -177,7 +225,7 @@ public final class GeminiBotanicalService {
                 )
             )
             
-            return (parsed.matches, careProfile)
+            return (domainMatches, careProfile)
         }
         
         throw NSError(domain: "GeminiBotanicalService", code: -4, userInfo: [NSLocalizedDescriptionKey: "Failed to parse Gemini response"])
@@ -270,11 +318,20 @@ public final class GeminiBotanicalService {
            let content = firstCandidate["content"] as? [String: Any],
            let parts = content["parts"] as? [[String: Any]],
            let firstPart = parts.first,
-           let text = firstPart["text"] as? String,
-           let responseData = text.data(using: .utf8) {
+           let text = firstPart["text"] as? String {
             
-            let diagnosis = try JSONDecoder().decode(PlantDiseaseDiagnosis.self, from: responseData)
-            return diagnosis
+            let cleanedText = cleanJsonString(text)
+            guard let responseData = cleanedText.data(using: .utf8) else {
+                throw NSError(domain: "GeminiBotanicalService", code: -4, userInfo: [NSLocalizedDescriptionKey: "Invalid text encoding in diagnosis response"])
+            }
+            
+            do {
+                let diagnosis = try JSONDecoder().decode(PlantDiseaseDiagnosis.self, from: responseData)
+                return diagnosis
+            } catch {
+                print("Gemini diagnosis decoding error: \(error), raw text: \(cleanedText)")
+                throw NSError(domain: "GeminiBotanicalService", code: -4, userInfo: [NSLocalizedDescriptionKey: "Could not parse diagnosis: \(error.localizedDescription)"])
+            }
         }
         
         throw NSError(domain: "GeminiBotanicalService", code: -4, userInfo: [NSLocalizedDescriptionKey: "Failed to parse Gemini JSON payload"])
